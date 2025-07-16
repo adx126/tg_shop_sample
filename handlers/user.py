@@ -49,7 +49,6 @@ async def category_selected(callback: types.CallbackQuery, bot: Bot, state: FSMC
         )
         return
 
-    # Проверим, есть ли товары на следующей странице
     next_page_products = await get_products_by_category(cat_id, page=1)
 
     nav_buttons = []
@@ -171,6 +170,7 @@ async def product_selected(callback: types.CallbackQuery, bot: Bot):
     track_message(user_id, sent.message_id)
 
 #--
+from services.product_photos import has_photos
 
 @router.callback_query(F.data.startswith("buy_"))
 async def buy_product(callback: types.CallbackQuery, bot: Bot):
@@ -185,13 +185,27 @@ async def buy_product(callback: types.CallbackQuery, bot: Bot):
         track_message(user_id, sent.message_id)
         return
 
+    if not await has_photos(prod_id):
+        markup = types.InlineKeyboardMarkup(
+            inline_keyboard=[
+                [types.InlineKeyboardButton(text="Back", callback_data=f"prod_{prod_id}_{cat_id}")]
+            ]
+        )
+        sent = await bot.send_message(
+            chat_id=user_id,
+            text="Not in stock.",
+            reply_markup=markup
+        )
+        track_message(user_id, sent.message_id)
+        return
+
     tron_wallet = await get_config("wallet") or "TRON_WALLET_NOT_SET"
     price = product["price"]
 
     message = (
-            f"To complete your purchase, send exactly <b>{price} USDT</b> (TRC-20) to the wallet address:\n\n"
-            f"<code>{tron_wallet}</code>\n\n"
-            "After the transaction is complete, press <b>Done</b> and submit the transaction hash (txid)."
+        f"To complete your purchase, send exactly <b>{price} USDT</b> (TRC-20) to the wallet address:\n\n"
+        f"<code>{tron_wallet}</code>\n\n"
+        "After the transaction is complete, press <b>Done</b> and submit the transaction hash (txid)."
     )
 
     markup = types.InlineKeyboardMarkup(
